@@ -5,18 +5,22 @@ python -m pip install --upgrade pip
 python -m pip install flask
 python -m pip install flask pytest
 ========================
+
+1. 
 source venv/Scripts/activate
 ------------------------------- 
 	# may have to re-add flask and these lines
 	export FLASK_APP=api.py
 	export FLASK_ENV=development   # optional, enables debug reload
 ------------------------------- 
+2. 
 python -m flask run
 http://127.0.0.1:5000/city_services
 ========================
 
 deactivate
 
+=============================================================
 curl -s -X POST http://127.0.0.1:5000/city_services \
   -H "Content-Type: application/json" \
   -d '{"name":"Water","type":"Utility"}' | jq
