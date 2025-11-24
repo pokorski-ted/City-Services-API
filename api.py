@@ -12,10 +12,24 @@ def get_services():
 
 @app.route('/city_services/<string:service_name>', methods=['GET'])
 def get_service(service_name):
-    for service in city_services:
-        if service['name'] == service_name:
-            return jsonify(service)
-    return jsonify({'error': 'Service not found'}), 404
+    try:
+        # Validate input
+        if not service_name or not isinstance(service_name, str):
+            return jsonify({"error": "Invalid service name"}), 400
+        
+            for service in city_services:
+                if service['name'] == service_name:
+                    return jsonify(service), 200 
+                
+            #not found
+            return jsonify({'error': 'Service not found'}), 404
+        
+    except KeyError as e:
+            return jsonify({"error: ": f"missing field: {str(e)}"}), 400
+    
+    except Exception as e:
+            return jsonify({"error: ": "Internal error"}), 500
+
 
 @app.route('/city_services', methods=['POST'])
 def create_service():

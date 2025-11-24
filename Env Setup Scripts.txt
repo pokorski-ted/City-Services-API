@@ -1,4 +1,4 @@
-start in project dir
+start in project dir - C:\Users\pokor\OneDrive\Documents\Python\City Services API
 =========================
 python -m venv venv
 python -m pip install --upgrade pip
