@@ -7,44 +7,6 @@ sock = Sock(app)
 import json
 import hashlib
 
-# move this to a seperate py file ---
-import strawberry
-from typing import List, Optional
-
-# city_services comes from your main file
-# but Strawberry needs to reference it directly
-
-@strawberry.type
-class Service:
-    id: int
-    name: str
-    type: Optional[str]
-
-def dict_to_service(d):
-    return Service(
-        id=d["id"],
-        name=d["name"],
-        type=d.get("type")
-    )
-
-
-@strawberry.type
-class Query:
-    @strawberry.field
-    def services(self) -> List[Service]:
-        return [dict_to_service(s) for s in city_services]
-
-    @strawberry.field
-    def service(self, id: int) -> Optional[Service]:
-        for s in city_services:
-            if s["id"] == id:
-                return dict_to_service(s)
-        return None
-
-
-schema = strawberry.Schema(query=Query)
-#----
-
 def make_etag(obj) -> str:
     """Generate a simple ETag from a Python object and HASH it."""
     raw = json.dumps(obj, sort_keys=True).encode("utf-8")
@@ -213,7 +175,46 @@ def delete_service(service_id):
 
     except Exception as e:
         return jsonify({"error: ": "Internal Error"}, 500)
-    
+
+
+# move this to a seperate py file ---
+import strawberry
+from typing import List, Optional
+
+# city_services comes from your main file
+# but Strawberry needs to reference it directly
+
+@strawberry.type
+class Service:
+    id: int
+    name: str
+    type: Optional[str]
+
+def dict_to_service(d):
+    return Service(
+        id=d["id"],
+        name=d["name"],
+        type=d.get("type")
+    )
+
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    def services(self) -> List[Service]:
+        return [dict_to_service(s) for s in city_services]
+
+    @strawberry.field
+    def service(self, id: int) -> Optional[Service]:
+        for s in city_services:
+            if s["id"] == id:
+                return dict_to_service(s)
+        return None
+
+
+schema = strawberry.Schema(query=Query)
+#----
+
 # more GraphQL stuff---
 from strawberry.flask.views import GraphQLView
 
