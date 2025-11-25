@@ -76,11 +76,11 @@ def services_ws(ws):
             ws_clients.remove(ws)
 
 
-@app.route('/city_services', methods=['GET'])
+@app.route('/api/v1/city_services', methods=['GET'])
 def get_services():
     return jsonify(city_services)
 
-@app.route('/city_services/<string:service_name>', methods=['GET'])
+@app.route('/api/v1/city_services/<string:service_name>', methods=['GET'])
 def get_service(service_name):
     try:
         # Validate input
@@ -129,7 +129,7 @@ def get_service(service_name):
             return jsonify({"error: ": "Internal error"}), 500
 
 
-@app.route('/city_services', methods=['POST'])
+@app.route('/api/v1/city_services', methods=['POST'])
 def create_service():
     try:
         
@@ -176,7 +176,7 @@ def create_service():
         # Any other unexpected server error
         return jsonify({"error": "Internal server error"}), 500
 
-@app.route('/city_services/<int:service_id>', methods=['PUT'])
+@app.route('/api/v1/city_services/<int:service_id>', methods=['PUT'])
 def update_service(service_id):
 
     try:
@@ -199,7 +199,7 @@ def update_service(service_id):
         return jsonify({"error: ": "Internal Error"}), 500
 
 
-@app.route('/city_services/<int:service_id>', methods=['DELETE'])
+@app.route('/api/v1/city_services/<int:service_id>', methods=['DELETE'])
 def delete_service(service_id):
 
     try:
@@ -218,7 +218,7 @@ def delete_service(service_id):
 from strawberry.flask.views import GraphQLView
 
 app.add_url_rule(
-    "/graphql",
+    "/api/v1/graphql",
     view_func=GraphQLView.as_view(
         "graphql_view",
         schema=schema,
