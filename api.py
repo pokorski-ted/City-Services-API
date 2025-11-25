@@ -2,6 +2,15 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
+import json
+import hashlib
+
+def make_etag(obj) -> str:
+    """Generate a simple ETag from a Python object and HASH it."""
+    raw = json.dumps(obj, sort_keys=True).encode("utf-8")
+    return '"' + hashlib.md5(raw).hexdigest() + '"'
+
+
 # simple in-memory store
 city_services = []
 next_id = 1
@@ -17,13 +26,41 @@ def get_service(service_name):
         if not service_name or not isinstance(service_name, str):
             return jsonify({"error": "Invalid service name"}), 400
         
-            for service in city_services:
-                if service['name'] == service_name:
-                    return jsonify(service), 200 
-                
+            service = None
+
+            for s in city_services:
+                if s.get("name") == service_name:
+                    service = s
+                    break
+
             #not found
-            return jsonify({'error': 'Service not found'}), 404
+            if not service:
+                return jsonify({'error': 'Service not found'}), 404
         
+            # Generate ETag from the service object
+            etag = make_etag(service)
+
+            # Read client's conditional header, if any
+            client_etag = request.headers.get("If-None-Match")
+
+            # Common caching headers
+            headers = {
+                "ETag": etag,
+                "Cache-Control": "max-age=60"  # cache for 60 seconds (demo)
+            }
+
+            # If the client's ETag matches, return 304 Not Modified
+            if client_etag == etag:
+                return ("", 304, headers)
+            
+            #otherwise return service        
+            response = jsonify(service)
+
+            # jsonify already sets Content-Type; we just add headers
+            for k, v in headers.items():
+                response.headers[k] = v
+            return response, 200
+
     except KeyError as e:
             return jsonify({"error: ": f"missing field: {str(e)}"}), 400
     
