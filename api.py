@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
+from flask_sock import Sock
 
 app = Flask(__name__)
+sock = Sock(app)
 
 import json
 import hashlib
@@ -14,6 +16,27 @@ def make_etag(obj) -> str:
 # simple in-memory store
 city_services = []
 next_id = 1
+
+# track connected WebSocket clients
+ws_clients = []
+
+# keep track of connected clients; broadcast a JSON message whenever a new service is created
+@sock.route('/ws/services')
+def services_ws(ws):
+    # Add client to list
+    ws_clients.append(ws)
+    try:
+        # Keep the connection open
+        while True:
+            # We don't really care what client sends; just block waiting
+            msg = ws.receive()
+            if msg is None:
+                break
+    finally:
+        # Ensure client is removed on disconnect
+        if ws in ws_clients:
+            ws_clients.remove(ws)
+
 
 @app.route('/city_services', methods=['GET'])
 def get_services():
@@ -85,6 +108,26 @@ def create_service():
 
         city_services.append(services)
         next_id += 1
+
+        # WEBSOCKET BROADCAST HERE ---
+        # Prepare JSON message
+        message = json.dumps({
+            "event": "service.created",
+            "data": services
+        })
+
+        # Send to all connected WS clients
+        # (make a copy of list to avoid modification during iteration)
+        for ws in list(ws_clients):
+            try:
+                ws.send(message)
+            except Exception:
+                # If a client is dead, drop it
+                if ws in ws_clients:
+                    ws_clients.remove(ws)
+        # END WEBSOCKET PART ---
+        # Every time you POST /city_services, all connected WS clients will get a "service.created" event with the new service
+
         return jsonify(services), 201
     
     except KeyError as e:
