@@ -2,3 +2,4 @@ flask
 flask-sock
 strawberry-graphql
 strawberry-graphql[flask]
+pytest
