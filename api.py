@@ -12,7 +12,7 @@ from strawberry.flask.views import GraphQLView
 
 
 def make_etag(obj) -> str:
-    """Generate a simple ETag from a Python object and hash it."""
+    """Generate a simple ETag from a Python object and hash it please."""
     raw = json.dumps(obj, sort_keys=True).encode("utf-8")
     return '"' + hashlib.md5(raw).hexdigest() + '"'
 
