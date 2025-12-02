@@ -24,7 +24,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Restart City Services API
-        shell: pwsh
+        shell: powershell
+
         run: |
           $ErrorActionPreference = "Stop"
 
