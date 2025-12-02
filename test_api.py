@@ -1,10 +1,19 @@
 import json
-from api import app, city_services  # adjust 'app' filename if needed
+import pytest
+from api import app
+from db import db, ServiceModel
 
 
-def setup_function(_):
-    # reset in-memory store before each test
-    city_services.clear()
+@pytest.fixture(autouse=True)
+def setup_database():
+    """Reset database before each test using in-memory SQLite."""
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config['TESTING'] = True
+    with app.app_context():
+        db.create_all()
+        yield
+        db.session.remove()
+        db.drop_all()
 
 
 def test_create_service():
@@ -120,3 +129,65 @@ def test_graphql_service_by_id():
     assert svc["id"] == service_id
     assert svc["name"] == "Water"
     assert svc["type"] == "Utility"
+
+
+def test_update_service():
+    client = app.test_client()
+
+    # create a service first
+    resp_create = client.post(
+        "/api/v1/city_services",
+        json={"name": "Water", "type": "Utility"}
+    )
+    created = resp_create.get_json()
+    service_id = created["id"]
+
+    # update the service
+    resp = client.put(
+        f"/api/v1/city_services/{service_id}",
+        json={"type": "Essential Utility"}
+    )
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+    assert data["id"] == service_id
+    assert data["name"] == "Water"
+    assert data["type"] == "Essential Utility"
+
+
+def test_update_service_not_found():
+    client = app.test_client()
+
+    resp = client.put(
+        "/api/v1/city_services/999",
+        json={"type": "Updated"}
+    )
+    assert resp.status_code == 404
+
+
+def test_delete_service():
+    client = app.test_client()
+
+    # create a service first
+    resp_create = client.post(
+        "/api/v1/city_services",
+        json={"name": "Water", "type": "Utility"}
+    )
+    created = resp_create.get_json()
+    service_id = created["id"]
+
+    # delete the service
+    resp = client.delete(f"/api/v1/city_services/{service_id}")
+    assert resp.status_code == 204
+
+    # verify it's deleted
+    resp_list = client.get("/api/v1/city_services")
+    data = resp_list.get_json()
+    assert len(data) == 0
+
+
+def test_delete_service_not_found():
+    client = app.test_client()
+
+    resp = client.delete("/api/v1/city_services/999")
+    assert resp.status_code == 404

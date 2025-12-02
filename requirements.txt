@@ -1,5 +1,6 @@
 flask
 flask-sock
+flask-sqlalchemy
 strawberry-graphql
 strawberry-graphql[flask]
 pytest

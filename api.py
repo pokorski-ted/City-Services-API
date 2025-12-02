@@ -1,25 +1,32 @@
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
-app = Flask(__name__)
-sock = Sock(app)
-
 import json
 import hashlib
+import os
 import strawberry
 from typing import List, Optional
 from strawberry.flask.views import GraphQLView
+
+from db import db, ServiceModel, init_db
+
+app = Flask(__name__)
+sock = Sock(app)
+
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL', 'sqlite:///city_services.db'
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+init_db(app)
 
 
 def make_etag(obj) -> str:
     """Generate a simple ETag from a Python object and hash it please."""
     raw = json.dumps(obj, sort_keys=True).encode("utf-8")
     return '"' + hashlib.md5(raw).hexdigest() + '"'
-
-
-# simple in-memory store
-city_services = []
-next_id = 1
 
 # track connected WebSocket clients
 ws_clients = []
@@ -43,7 +50,8 @@ def services_ws(ws):
 
 @app.route('/api/v1/city_services', methods=['GET'])
 def get_services():
-    return jsonify(city_services), 200
+    services = ServiceModel.query.all()
+    return jsonify([s.to_dict() for s in services]), 200
 
 
 @app.route('/api/v1/city_services/<string:service_name>', methods=['GET'])
@@ -53,19 +61,16 @@ def get_service(service_name):
         if not service_name or not isinstance(service_name, str):
             return jsonify({"error": "Invalid service name"}), 400
 
-        
-        service = None
-        for s in city_services:
-            if s.get("name") == service_name:
-                service = s
-                break
+        service = ServiceModel.query.filter_by(name=service_name).first()
 
         # Not found
         if not service:
             return jsonify({'error': 'Service not found'}), 404
 
+        service_dict = service.to_dict()
+
         # Generate ETag from the service object
-        etag = make_etag(service)
+        etag = make_etag(service_dict)
 
         # Read client's conditional header, if any
         client_etag = request.headers.get("If-None-Match")
@@ -81,7 +86,7 @@ def get_service(service_name):
             return ("", 304, headers)
 
         # Otherwise return full resource
-        response = jsonify(service)
+        response = jsonify(service_dict)
         for k, v in headers.items():
             response.headers[k] = v
         return response, 200
@@ -100,21 +105,20 @@ def create_service():
         if not data.get('name'):
             return jsonify({'error': 'Service name required'}), 400
 
-        global next_id
-        services = {
-            'id': next_id,
-            'name': data.get('name'),
-            'type': data.get('type')
-        }
+        service = ServiceModel(
+            name=data.get('name'),
+            type=data.get('type')
+        )
+        db.session.add(service)
+        db.session.commit()
 
-        city_services.append(services)
-        next_id += 1
+        service_dict = service.to_dict()
 
         # WEBSOCKET BROADCAST HERE ---
         try:
             message = json.dumps({
                 "event": "service.created",
-                "data": services
+                "data": service_dict
             })
             for ws in list(ws_clients):
                 try:
@@ -127,12 +131,13 @@ def create_service():
             print("WebSocket broadcast error:", repr(e))
         # END WEBSOCKET PART ---
 
-        return jsonify(services), 201
+        return jsonify(service_dict), 201
 
     except KeyError as e:
         return jsonify({"error": f"Missing field: {str(e)}"}), 400
 
     except Exception as e:
+        db.session.rollback()
         print("create_service error:", repr(e))
         return jsonify({"error": "Internal server error"}), 500
 
@@ -142,21 +147,24 @@ def update_service(service_id):
     try:
         data = request.get_json(force=False, silent=True) or {}
 
-        for service in city_services:
-            if service['id'] == service_id:
-                # update only provided fields
-                for k in ('name', 'type'):
-                    if k in data:
-                        service[k] = data[k]
-                return jsonify(service), 200
+        service = db.session.get(ServiceModel, service_id)
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
 
-        
-        return jsonify({'error': 'Service not found'}), 404
+        # update only provided fields
+        if 'name' in data:
+            service.name = data['name']
+        if 'type' in data:
+            service.type = data['type']
+
+        db.session.commit()
+        return jsonify(service.to_dict()), 200
 
     except KeyError as e:
         return jsonify({"error": f"Missing field: {str(e)}"}), 400
 
     except Exception as e:
+        db.session.rollback()
         print("update_service error:", repr(e))
         return jsonify({"error": "Internal Error"}), 500
 
@@ -164,16 +172,17 @@ def update_service(service_id):
 @app.route('/api/v1/city_services/<int:service_id>', methods=['DELETE'])
 def delete_service(service_id):
     try:
-        for service in city_services:
-            if service['id'] == service_id:
-                city_services.remove(service)
-                return '', 204
+        service = db.session.get(ServiceModel, service_id)
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
 
-        return jsonify({'error': 'Service not found'}), 404
+        db.session.delete(service)
+        db.session.commit()
+        return '', 204
 
     except Exception as e:
+        db.session.rollback()
         print("delete_service error:", repr(e))
-
         return jsonify({"error": "Internal Error"}), 500
 
 
@@ -198,13 +207,14 @@ def dict_to_service(d: dict) -> Service:
 class Query:
     @strawberry.field
     def services(self) -> List[Service]:
-        return [dict_to_service(s) for s in city_services]
+        all_services = ServiceModel.query.all()
+        return [dict_to_service(s.to_dict()) for s in all_services]
 
     @strawberry.field
     def service(self, id: int) -> Optional[Service]:
-        for s in city_services:
-            if s["id"] == id:
-                return dict_to_service(s)
+        s = db.session.get(ServiceModel, id)
+        if s:
+            return dict_to_service(s.to_dict())
         return None
 
 
