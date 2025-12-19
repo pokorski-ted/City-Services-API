@@ -5,3 +5,4 @@ strawberry-graphql[flask]
 pytest
 fastapi
 uvicorn[standard]
+sqlalchemy
