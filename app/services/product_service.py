@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.models.product import ProductCreate, Product
 from app.db.models import ProductDB
 
+import logging
+logger = logging.getLogger("city_services.product_service")
 
 class ProductService:
     def __init__(self, db: Session) -> None:
@@ -16,6 +18,8 @@ class ProductService:
 
     def get_all(self) -> List[Product]:
         # Query all rows from the products table
+        logger.info("Getting all products")
+        
         rows = self._db.query(ProductDB).all()
 
         # Convert DB models -> API models (Pydantic)
@@ -28,12 +32,15 @@ class ProductService:
         return Product(id=row.id, name=row.name)
 
     def create(self, request: ProductCreate) -> Product:
+        logger.info("Creating product name=%s", request.name)
+
         # Create the DB row
         row = ProductDB(name=request.name)
         self._db.add(row)
         self._db.commit()
         self._db.refresh(row)  # Loads generated id from DB
 
+        logger.info("Created product id=%s name=%s", row.id, row.name)
         return Product(id=row.id, name=row.name)
     
     def update(self, product_id: int, request: ProductCreate) -> Optional[Product]:
@@ -41,6 +48,8 @@ class ProductService:
         Update an existing product.
         Returns updated Product or None if not found.
         """
+        logger.info("Updating product id=%s name=%s", product_id, request.name)
+        
         row = self._db.query(ProductDB).filter(ProductDB.id == product_id).first()
         if row is None:
             return None
@@ -49,6 +58,8 @@ class ProductService:
         self._db.commit()
         self._db.refresh(row)
 
+        logger.info("Updated product id=%s name=%s", row.id, row.name)
+
         return Product(id=row.id, name=row.name)
 
     def delete(self, product_id: int) -> bool:
@@ -56,10 +67,14 @@ class ProductService:
         Delete an existing product.
         Returns True if deleted, False if not found.
         """
+        logger.info("Deleting product id=%s", product_id)
+
         row = self._db.query(ProductDB).filter(ProductDB.id == product_id).first()
         if row is None:
             return False
 
         self._db.delete(row)
         self._db.commit()
+
+        logger.info("Deleted product id=%s name=%s", row.id, row.name)
         return True

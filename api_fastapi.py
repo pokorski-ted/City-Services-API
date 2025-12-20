@@ -11,6 +11,16 @@ from app.services.product_service import ProductService
 from sqlalchemy.orm import Session
 from app.db.deps import get_db
 
+# api_fastapi.py
+# Purpose: Central logging configuration for the application.
+
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s"
+)
+
 # Create the FastAPI app (also powers /docs via OpenAPI)
 app = FastAPI(title="City Services API")
 
