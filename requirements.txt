@@ -6,3 +6,5 @@ pytest
 fastapi
 uvicorn[standard]
 sqlalchemy
+pytest
+httpx
